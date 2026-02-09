@@ -37,16 +37,16 @@ printf "${N}"
 # ── Interactive prompts ──────────────────────────────────────────────────────
 printf "  ${Y}Paste the values from server setup output:${N}\n\n"
 
-read -rp "  Server public IP        : " SERVER_PUBLIC_IP
+read -rp "  Server public IP        : " SERVER_PUBLIC_IP < /dev/tty
 echo ""
 printf "  ${B}── AmneziaWG keys ──${N}\n"
-read -rp "  AWG_CLIENT_PRIVKEY      : " AWG_CLIENT_PRIVKEY
-read -rp "  AWG_SERVER_PUBKEY       : " AWG_SERVER_PUBKEY
-read -rp "  AWG_PSK                 : " AWG_PSK
+read -rp "  AWG_CLIENT_PRIVKEY      : " AWG_CLIENT_PRIVKEY < /dev/tty
+read -rp "  AWG_SERVER_PUBKEY       : " AWG_SERVER_PUBKEY < /dev/tty
+read -rp "  AWG_PSK                 : " AWG_PSK < /dev/tty
 echo ""
 printf "  ${B}── Cloak keys ──${N}\n"
-read -rp "  CK_PUBKEY               : " CK_PUBKEY
-read -rp "  CK_UID                  : " CK_UID
+read -rp "  CK_PUBKEY               : " CK_PUBKEY < /dev/tty
+read -rp "  CK_UID                  : " CK_UID < /dev/tty
 echo ""
 
 # Validate all fields
@@ -87,17 +87,32 @@ apt-get install -y -qq build-essential git pkg-config \
 ok "Base packages ready"
 
 step "2/5" "Installing Go..."
-if ! command -v go &>/dev/null || [[ $(go version 2>/dev/null | grep -oP '1\.\K\d+' || echo 0) -lt 21 ]]; then
-    GO_VER="1.22.5"
-    wget -q "https://go.dev/dl/go${GO_VER}.linux-amd64.tar.gz" -O /tmp/go.tar.gz
-    rm -rf /usr/local/go
-    tar -C /usr/local -xzf /tmp/go.tar.gz
-    rm /tmp/go.tar.gz
-    ok "Go ${GO_VER} installed"
-else
-    ok "Go already installed"
+GO_OK=false
+if command -v go &>/dev/null; then
+    GO_MINOR=$(go version 2>/dev/null | grep -oP '1\.\K\d+' || echo "0")
+    if [[ "$GO_MINOR" -ge 21 ]]; then
+        GO_OK=true
+        ok "Go already installed ($(go version 2>/dev/null | grep -oP 'go[0-9.]+'))"
+    fi
 fi
-export PATH="/usr/local/go/bin:$PATH"
+if [[ "$GO_OK" == "false" ]]; then
+    GO_VER="1.22.5"
+    if wget -q --timeout=10 "https://go.dev/dl/go${GO_VER}.linux-amd64.tar.gz" -O /tmp/go.tar.gz 2>/dev/null; then
+        rm -rf /usr/local/go
+        tar -C /usr/local -xzf /tmp/go.tar.gz
+        rm -f /tmp/go.tar.gz
+        ok "Go ${GO_VER} installed (binary)"
+    else
+        info "Direct download failed, trying apt..."
+        apt-get install -y -qq golang-go 2>/dev/null || true
+        if command -v go &>/dev/null; then
+            ok "Go installed via apt ($(go version 2>/dev/null | grep -oP 'go[0-9.]+'))"
+        else
+            err "Go installation failed! AmneziaWG build may fail."
+        fi
+    fi
+fi
+export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
 
 step "3/5" "Installing AmneziaWG..."
 if ! command -v awg &>/dev/null; then

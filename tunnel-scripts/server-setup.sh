@@ -51,15 +51,15 @@ DETECTED_IP=$(detect_ip)
 
 if [[ -n "$DETECTED_IP" ]]; then
     printf "  ${G}Detected public IP:${N} ${B}%s${N}\n" "$DETECTED_IP"
-    read -rp "  Use this IP? [Y/n]: " USE_DETECTED
+    read -rp "  Use this IP? [Y/n]: " USE_DETECTED < /dev/tty
     if [[ "${USE_DETECTED,,}" == "n" ]]; then
-        read -rp "  Enter server public IP: " SERVER_PUBLIC_IP
+        read -rp "  Enter server public IP: " SERVER_PUBLIC_IP < /dev/tty
     else
         SERVER_PUBLIC_IP="$DETECTED_IP"
     fi
 else
     info "Could not auto-detect public IP."
-    read -rp "  Enter server public IP: " SERVER_PUBLIC_IP
+    read -rp "  Enter server public IP: " SERVER_PUBLIC_IP < /dev/tty
 fi
 
 if [[ -z "$SERVER_PUBLIC_IP" ]]; then
@@ -104,17 +104,32 @@ apt-get install -y -qq build-essential git pkg-config \
 ok "Base packages ready"
 
 step "2/7" "Installing Go..."
-if ! command -v go &>/dev/null || [[ $(go version 2>/dev/null | grep -oP '1\.\K\d+' || echo 0) -lt 21 ]]; then
-    GO_VER="1.22.5"
-    wget -q "https://go.dev/dl/go${GO_VER}.linux-amd64.tar.gz" -O /tmp/go.tar.gz
-    rm -rf /usr/local/go
-    tar -C /usr/local -xzf /tmp/go.tar.gz
-    rm /tmp/go.tar.gz
-    ok "Go ${GO_VER} installed"
-else
-    ok "Go already installed"
+GO_OK=false
+if command -v go &>/dev/null; then
+    GO_MINOR=$(go version 2>/dev/null | grep -oP '1\.\K\d+' || echo "0")
+    if [[ "$GO_MINOR" -ge 21 ]]; then
+        GO_OK=true
+        ok "Go already installed ($(go version 2>/dev/null | grep -oP 'go[0-9.]+'))"
+    fi
 fi
-export PATH="/usr/local/go/bin:$PATH"
+if [[ "$GO_OK" == "false" ]]; then
+    GO_VER="1.22.5"
+    if wget -q --timeout=10 "https://go.dev/dl/go${GO_VER}.linux-amd64.tar.gz" -O /tmp/go.tar.gz 2>/dev/null; then
+        rm -rf /usr/local/go
+        tar -C /usr/local -xzf /tmp/go.tar.gz
+        rm -f /tmp/go.tar.gz
+        ok "Go ${GO_VER} installed (binary)"
+    else
+        info "Direct download failed, trying apt..."
+        apt-get install -y -qq golang-go 2>/dev/null || true
+        if command -v go &>/dev/null; then
+            ok "Go installed via apt ($(go version 2>/dev/null | grep -oP 'go[0-9.]+'))"
+        else
+            err "Go installation failed! AmneziaWG build may fail."
+        fi
+    fi
+fi
+export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
 
 step "3/7" "Installing AmneziaWG..."
 if ! command -v awg &>/dev/null; then
