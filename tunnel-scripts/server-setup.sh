@@ -151,23 +151,20 @@ if ! command -v amneziawg-go &>/dev/null && [[ ! -f /usr/local/bin/amneziawg-go 
     rm -rf /tmp/amneziawg-go
     git clone --depth 1 -q https://github.com/amnezia-vpn/amneziawg-go.git /tmp/amneziawg-go
     cd /tmp/amneziawg-go
-    if make -j"$(nproc)" 2>&1; then
+
+    # Pre-patch: force local Go version, remove toolchain requirement
+    GO_LOCAL_VER=$(go version | grep -oP '1\.\d+' | head -1)
+    sed -i "s/^go .*/go ${GO_LOCAL_VER}/" go.mod
+    sed -i '/^toolchain/d' go.mod
+    go env -w GOTOOLCHAIN=local GOPROXY=direct GONOSUMCHECK='*' GONOSUMDB='*' 2>/dev/null || true
+
+    info "Building amneziawg-go with Go ${GO_LOCAL_VER}..."
+    if GOTOOLCHAIN=local GOPROXY=direct make -j"$(nproc)" 2>&1; then
         cp amneziawg-go /usr/local/bin/
         ok "amneziawg-go installed"
     else
-        err "amneziawg-go build failed (Go proxy may be blocked)"
-        info "Trying with GOTOOLCHAIN=local and older go.mod..."
-        # Patch go.mod to use local Go version
-        GO_LOCAL_VER=$(go version | grep -oP '1\.\d+' | head -1)
-        sed -i "s/^go .*/go ${GO_LOCAL_VER}/" go.mod
-        sed -i '/^toolchain/d' go.mod
-        if make -j"$(nproc)" 2>&1; then
-            cp amneziawg-go /usr/local/bin/
-            ok "amneziawg-go installed (patched)"
-        else
-            err "amneziawg-go build failed! WireGuard userspace won't be available."
-            info "AmneziaWG may still work if kernel module is loaded."
-        fi
+        err "amneziawg-go build failed! WireGuard userspace won't be available."
+        info "AmneziaWG may still work if kernel module is loaded."
     fi
 else
     ok "amneziawg-go already installed"
