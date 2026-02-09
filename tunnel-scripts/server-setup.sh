@@ -26,8 +26,8 @@ spin()  {
             sleep 0.1
         done
     done
-    wait "$pid" 2>/dev/null
-    printf "\r"
+    wait "$pid" 2>/dev/null || true
+    printf "\r\033[2K"
 }
 
 [[ $EUID -ne 0 ]] && { err "Run as root: sudo bash $0"; exit 1; }
@@ -299,7 +299,7 @@ ok(){ printf "  ${G}✔${N} %s\n" "$1"; }
 info(){ printf "  ${C}ℹ${N} %s\n" "$1"; }
 err(){ printf "  ${R}✖${N} %s\n" "$1"; }
 step(){ printf "\n${B}▶ [%s] %s${N}\n" "$1" "$2"; }
-spin(){ local pid=$1 msg=$2; local c='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'; while kill -0 "$pid" 2>/dev/null; do for((i=0;i<${#c};i++)); do printf "\r  ${C}%s${N} %s" "${c:$i:1}" "$msg"; sleep 0.1; done; done; wait "$pid" 2>/dev/null; printf "\r"; }
+spin(){ local pid=$1 msg=$2; local c='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'; while kill -0 "$pid" 2>/dev/null; do for((i=0;i<${#c};i++)); do printf "\r  ${C}%s${N} %s" "${c:$i:1}" "$msg"; sleep 0.1; done; done; wait "$pid" 2>/dev/null || true; printf "\r\033[2K"; }
 [[ $EUID -ne 0 ]] && { err "Run as root: sudo bash $0"; exit 1; }
 clear
 printf "${B}${C}\n  ╔═══════════════════════════════════════════╗\n  ║   🛡️  Tunnel Client Setup (auto)          ║\n  ╚═══════════════════════════════════════════╝\n\n${N}"
