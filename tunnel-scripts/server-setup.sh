@@ -283,8 +283,10 @@ ok "OpenVPN server configured"
 mkdir -p /etc/cloak
 
 CK_KEY_RAW=$(ck-server -key 2>&1 || true)
-CK_PRIVKEY=$(echo "$CK_KEY_RAW" | grep -i "priv" | sed 's/.*: //' || echo "$CK_KEY_RAW" | head -1)
-CK_PUBKEY=$(echo "$CK_KEY_RAW"  | grep -i "pub"  | sed 's/.*: //' || echo "$CK_KEY_RAW" | tail -1)
+# Extract just the base64 key — strip labels and all whitespace
+CK_PRIVKEY=$(echo "$CK_KEY_RAW" | grep -i "priv" | sed 's/.*://; s/[[:space:]]//g')
+CK_PUBKEY=$(echo "$CK_KEY_RAW"  | grep -i "pub"  | sed 's/.*://; s/[[:space:]]//g')
+# Fallback: if no labels, take first/last line
 if [[ -z "$CK_PRIVKEY" || -z "$CK_PUBKEY" ]]; then
     CK_PRIVKEY=$(echo "$CK_KEY_RAW" | head -1 | tr -d '[:space:]')
     CK_PUBKEY=$(echo "$CK_KEY_RAW"  | tail -1 | tr -d '[:space:]')
@@ -434,6 +436,7 @@ echo ""
 line
 
 printf "\n  ${Y}${B}── STEP 1: Copy .ovpn file to client ──${N}\n\n"
+printf "  ${C}ssh root@CLIENT_IP 'mkdir -p /etc/openvpn'${N}\n"
 printf "  ${C}scp %s/client1.ovpn root@CLIENT_IP:/etc/openvpn/client-cloak.conf${N}\n" "$OUT_DIR"
 
 printf "\n  ${Y}${B}── STEP 2: Run this on the client ──${N}\n\n"
