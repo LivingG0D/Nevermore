@@ -108,6 +108,7 @@ export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
 export GOTOOLCHAIN=local GOPROXY=direct GONOSUMCHECK="*" GONOSUMDB="*" GOFLAGS="-mod=mod"
 
 step "3/6" "Installing AmneziaWG..."
+# Tools (awg, awg-quick)
 if ! command -v awg &>/dev/null; then
     rm -rf /tmp/amneziawg-tools
     git clone --depth 1 -q https://github.com/amnezia-vpn/amneziawg-tools.git /tmp/amneziawg-tools
@@ -117,18 +118,44 @@ if ! command -v awg &>/dev/null; then
 else
     ok "amneziawg-tools (cached)"
 fi
-if [[ ! -f /usr/local/bin/amneziawg-go ]] && ! command -v amneziawg-go &>/dev/null; then
-    rm -rf /tmp/amneziawg-go
-    git clone --depth 1 -q https://github.com/amnezia-vpn/amneziawg-go.git /tmp/amneziawg-go
-    cd /tmp/amneziawg-go
-    GLV=$(go version | grep -oP '1\.\d+' | head -1)
-    sed -i "s/^go .*/go ${GLV}/" go.mod; sed -i '/^toolchain/d' go.mod
-    go env -w GOTOOLCHAIN=local GOPROXY=direct GONOSUMCHECK='*' GONOSUMDB='*' 2>/dev/null || true
-    (GOTOOLCHAIN=local GOPROXY=direct make -j"$(nproc)") &>/dev/null 2>&1 &
-    spin $! "Building amneziawg-go (this takes a minute)..."
-    [[ -f amneziawg-go ]] && { cp amneziawg-go /usr/local/bin/; ok "amneziawg-go"; } || err "amneziawg-go build failed (non-critical)"
+
+# Kernel module (preferred — no Go needed)
+AWG_READY=false
+if ! lsmod 2>/dev/null | grep -q amneziawg; then
+    rm -rf /tmp/amneziawg-kmod
+    git clone --depth 1 -q https://github.com/amnezia-vpn/amneziawg-linux-kernel-module.git /tmp/amneziawg-kmod
+    (cd /tmp/amneziawg-kmod/src && make -j"$(nproc)" && make install) &>/dev/null 2>&1 &
+    spin $! "Building kernel module..."
+    if modprobe amneziawg 2>/dev/null; then
+        AWG_READY=true
+        ok "amneziawg kernel module"
+    else
+        info "Kernel module failed, trying Go userspace..."
+    fi
 else
-    ok "amneziawg-go (cached)"
+    AWG_READY=true
+    ok "amneziawg kernel module (loaded)"
+fi
+
+# Fallback: Go userspace (only if kernel module failed)
+if [[ "$AWG_READY" == "false" ]]; then
+    if [[ ! -f /usr/local/bin/amneziawg-go ]] && ! command -v amneziawg-go &>/dev/null; then
+        if command -v go &>/dev/null; then
+            rm -rf /tmp/amneziawg-go
+            git clone --depth 1 -q https://github.com/amnezia-vpn/amneziawg-go.git /tmp/amneziawg-go
+            cd /tmp/amneziawg-go
+            GLV=$(go version | grep -oP '1\.\d+' | head -1)
+            sed -i "s/^go .*/go ${GLV}/" go.mod; sed -i '/^toolchain/d' go.mod
+            go env -w GOTOOLCHAIN=local GOPROXY=direct GONOSUMCHECK='*' GONOSUMDB='*' 2>/dev/null || true
+            (GOTOOLCHAIN=local GOPROXY=direct make -j"$(nproc)") &>/dev/null 2>&1 &
+            spin $! "Building amneziawg-go..."
+            [[ -f amneziawg-go ]] && { cp amneziawg-go /usr/local/bin/; ok "amneziawg-go (userspace)"; } || err "amneziawg-go build failed"
+        else
+            err "No Go compiler available for userspace fallback"
+        fi
+    else
+        ok "amneziawg-go (cached)"
+    fi
 fi
 
 step "4/6" "Installing Cloak..."
@@ -275,11 +302,14 @@ WantedBy=multi-user.target
 U
 
 systemctl daemon-reload
-awg-quick up awg0 2>/dev/null || systemctl start awg-quick@awg0
-systemctl enable awg-quick@awg0 &>/dev/null || true
-systemctl enable --now cloak-server &>/dev/null
-systemctl enable --now openvpn@server-cloak &>/dev/null
-ok "Services started"
+if awg-quick up awg0 2>/dev/null || systemctl start awg-quick@awg0 2>/dev/null; then
+    systemctl enable awg-quick@awg0 &>/dev/null || true
+    ok "AmneziaWG started (10.10.10.1)"
+else
+    err "AmneziaWG failed to start — check: journalctl -xeu awg-quick@awg0"
+fi
+systemctl enable --now cloak-server &>/dev/null && ok "Cloak server started" || err "Cloak server failed"
+systemctl enable --now openvpn@server-cloak &>/dev/null && ok "OpenVPN started" || err "OpenVPN failed"
 
 # ═════════════════════════════════════════════════════════════════════════════
 #  GENERATE SELF-CONTAINED CLIENT INSTALLER
@@ -360,18 +390,43 @@ if ! command -v awg &>/dev/null; then
 else
     ok "amneziawg-tools (cached)"
 fi
-if [[ ! -f /usr/local/bin/amneziawg-go ]] && ! command -v amneziawg-go &>/dev/null; then
-    rm -rf /tmp/amneziawg-go
-    git clone --depth 1 -q https://github.com/amnezia-vpn/amneziawg-go.git /tmp/amneziawg-go
-    cd /tmp/amneziawg-go
-    GLV=$(go version | grep -oP '1\.\d+' | head -1)
-    sed -i "s/^go .*/go ${GLV}/" go.mod; sed -i '/^toolchain/d' go.mod
-    go env -w GOTOOLCHAIN=local GOPROXY=direct GONOSUMCHECK='*' GONOSUMDB='*' 2>/dev/null || true
-    (GOTOOLCHAIN=local GOPROXY=direct make -j"$(nproc)") &>/dev/null 2>&1 &
-    spin $! "Building amneziawg-go..."
-    [[ -f amneziawg-go ]] && { cp amneziawg-go /usr/local/bin/; ok "amneziawg-go"; } || err "amneziawg-go build failed (non-critical)"
+
+# Kernel module (preferred)
+AWG_READY=false
+if ! lsmod 2>/dev/null | grep -q amneziawg; then
+    rm -rf /tmp/amneziawg-kmod
+    git clone --depth 1 -q https://github.com/amnezia-vpn/amneziawg-linux-kernel-module.git /tmp/amneziawg-kmod
+    (cd /tmp/amneziawg-kmod/src && make -j"$(nproc)" && make install) &>/dev/null 2>&1 &
+    spin $! "Building kernel module..."
+    if modprobe amneziawg 2>/dev/null; then
+        AWG_READY=true
+        ok "amneziawg kernel module"
+    else
+        info "Kernel module failed, trying Go userspace..."
+    fi
 else
-    ok "amneziawg-go (cached)"
+    AWG_READY=true
+    ok "amneziawg kernel module (loaded)"
+fi
+
+if [[ "$AWG_READY" == "false" ]]; then
+    if [[ ! -f /usr/local/bin/amneziawg-go ]] && ! command -v amneziawg-go &>/dev/null; then
+        if command -v go &>/dev/null; then
+            rm -rf /tmp/amneziawg-go
+            git clone --depth 1 -q https://github.com/amnezia-vpn/amneziawg-go.git /tmp/amneziawg-go
+            cd /tmp/amneziawg-go
+            GLV=$(go version | grep -oP '1\.\d+' | head -1)
+            sed -i "s/^go .*/go ${GLV}/" go.mod; sed -i '/^toolchain/d' go.mod
+            go env -w GOTOOLCHAIN=local GOPROXY=direct GONOSUMCHECK='*' GONOSUMDB='*' 2>/dev/null || true
+            (GOTOOLCHAIN=local GOPROXY=direct make -j"$(nproc)") &>/dev/null 2>&1 &
+            spin $! "Building amneziawg-go..."
+            [[ -f amneziawg-go ]] && { cp amneziawg-go /usr/local/bin/; ok "amneziawg-go"; } || err "amneziawg-go build failed"
+        else
+            err "No Go compiler for userspace fallback"
+        fi
+    else
+        ok "amneziawg-go (cached)"
+    fi
 fi
 
 step "4/5" "Installing Cloak client..."
@@ -498,11 +553,14 @@ WantedBy=multi-user.target
 UNIT
 
 systemctl daemon-reload
-awg-quick up awg0 2>/dev/null || systemctl start awg-quick@awg0
-systemctl enable awg-quick@awg0 &>/dev/null || true
-systemctl enable --now cloak-client &>/dev/null
-systemctl enable --now openvpn-cloak &>/dev/null
-ok "All services started"
+if awg-quick up awg0 2>/dev/null || systemctl start awg-quick@awg0 2>/dev/null; then
+    systemctl enable awg-quick@awg0 &>/dev/null || true
+    ok "AmneziaWG started (10.10.10.2)"
+else
+    err "AmneziaWG failed — check: journalctl -xeu awg-quick@awg0"
+fi
+systemctl enable --now cloak-client &>/dev/null && ok "Cloak client started" || err "Cloak client failed"
+systemctl enable --now openvpn-cloak &>/dev/null && ok "OpenVPN started" || err "OpenVPN failed"
 
 echo ""
 printf "${B}${G}"
