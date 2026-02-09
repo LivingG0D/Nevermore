@@ -1,10 +1,10 @@
 # Tunnel Scripts: AmneziaWG + OpenVPN over Cloak
 
-Two copy-paste scripts to set up a dual tunnel between two Ubuntu servers.
+Dual tunnel between two Ubuntu servers — one command each side.
 
 ## Architecture
 
-```
+```text
 ┌────────────────────┐                          ┌────────────────────┐
 │    CLIENT           │                          │    SERVER           │
 │                     │                          │                     │
@@ -20,76 +20,57 @@ Two copy-paste scripts to set up a dual tunnel between two Ubuntu servers.
 
 ## Quick Start
 
-### Step 1 — Server
+### 1. Run on Server
 
 ```bash
 curl -sL https://raw.githubusercontent.com/LivingG0D/Nevermore/main/tunnel-scripts/server-setup.sh | sudo bash
 ```
 
-> Auto-detects your IP. Prints keys at the end — **copy them**.
+That's it. The script will:
+- Auto-detect your IP
+- Install AmneziaWG + OpenVPN + Cloak
+- Generate all keys and certificates
+- Start all services
+- **Ask for client IP to auto-deploy** (or give you a manual SCP command)
 
-### Step 2 — Client
+### 2. If Manual Deploy
 
 ```bash
-# Copy the .ovpn file from server first:
-scp root@YOUR_SERVER:/root/tunnel-client-files/client1.ovpn /etc/openvpn/client-cloak.conf
-
-# Run client setup (it will prompt for the keys):
-curl -sL https://raw.githubusercontent.com/LivingG0D/Nevermore/main/tunnel-scripts/client-setup.sh | sudo bash
+scp /root/tunnel-client-files/client-install.sh root@CLIENT_IP:/tmp/
+ssh root@CLIENT_IP 'bash /tmp/client-install.sh'
 ```
 
-### Step 3 — Test
+### 3. Test
 
 ```bash
-ping 10.10.10.1   # AmneziaWG tunnel
-ping 10.20.20.1   # OpenVPN tunnel
-```
-
-## IP Addresses
-
-| Tunnel    | Server       | Client       |
-|-----------|-------------|-------------|
-| AmneziaWG | `10.10.10.1` | `10.10.10.2` |
-| OpenVPN   | `10.20.20.1` | `10.20.20.x` |
-
-## Ports
-
-| Service   | Port | Protocol | Notes                    |
-|-----------|------|----------|--------------------------|
-| AmneziaWG | 51820 | UDP    | Direct                   |
-| Cloak     | 443   | TCP    | Disguised as HTTPS       |
-| OpenVPN   | 1194  | TCP    | Localhost only (via Cloak)|
-
-## Useful Commands
-
-```bash
-# AmneziaWG
-awg show                              # status
-awg-quick down awg0                   # stop
-awg-quick up awg0                     # start
-
-# Cloak
-systemctl status cloak-server         # (server)
-systemctl status cloak-client         # (client)
-journalctl -u cloak-server -f         # logs
-
-# OpenVPN
-systemctl status openvpn@server-cloak # (server)
-systemctl status openvpn-cloak        # (client)
-journalctl -u openvpn-cloak -f        # logs
+ping 10.10.10.1   # AmneziaWG
+ping 10.20.20.1   # OpenVPN
 ```
 
 ## Uninstall
-
-Run on either server or client to cleanly remove everything:
 
 ```bash
 curl -sL https://raw.githubusercontent.com/LivingG0D/Nevermore/main/tunnel-scripts/uninstall.sh | sudo bash
 ```
 
-## Firewall
+## IP Addresses
 
-If you have `ufw` or `iptables` rules, open these on the **server**:
+| Tunnel    | Server       | Client       |
+|-----------|--------------|--------------|
+| AmneziaWG | `10.10.10.1` | `10.10.10.2` |
+| OpenVPN   | `10.20.20.1` | `10.20.20.x` |
+
+## Useful Commands
+
+```bash
+awg show                           # AmneziaWG status
+systemctl status cloak-server      # Cloak (server)
+systemctl status cloak-client      # Cloak (client)
+systemctl status openvpn-cloak     # OpenVPN (client)
+systemctl status openvpn@server-cloak  # OpenVPN (server)
+```
+
+## Firewall
 
 ```bash
 ufw allow 51820/udp   # AmneziaWG
