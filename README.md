@@ -23,28 +23,27 @@ Two copy-paste scripts to set up a dual tunnel between two Ubuntu servers.
 ### Step 1 — Server
 
 ```bash
-# Upload server-setup.sh to your server, then:
-nano server-setup.sh        # set SERVER_PUBLIC_IP="x.x.x.x"
-sudo bash server-setup.sh
+curl -sLO https://raw.githubusercontent.com/LivingG0D/Nevermore/main/tunnel-scripts/server-setup.sh && nano server-setup.sh && sudo bash server-setup.sh
 ```
 
-The script will print values at the end — **copy them**.
+> Set `SERVER_PUBLIC_IP` when the editor opens, save, and the script runs automatically.
+> It will print values at the end — **copy them**.
 
 ### Step 2 — Client
 
 ```bash
-# First, copy the .ovpn file from server:
+# Copy the .ovpn file from server:
 scp root@YOUR_SERVER:/root/tunnel-client-files/client1.ovpn /etc/openvpn/client-cloak.conf
 
-# Upload client-setup.sh to your client, then:
-nano client-setup.sh        # paste the values from Step 1
-sudo bash client-setup.sh
+# Download and run client script:
+curl -sLO https://raw.githubusercontent.com/LivingG0D/Nevermore/main/tunnel-scripts/client-setup.sh && nano client-setup.sh && sudo bash client-setup.sh
 ```
+
+> Paste the values from Step 1 when the editor opens.
 
 ### Step 3 — Test
 
 ```bash
-# On client:
 ping 10.10.10.1   # AmneziaWG tunnel
 ping 10.20.20.1   # OpenVPN tunnel
 ```
