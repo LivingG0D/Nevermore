@@ -33,8 +33,21 @@ BANNER
 printf "${N}"
 
 # ── Interactive prompts ──────────────────────────────────────────────────────
-# Auto-detect public IP
-DETECTED_IP=$(curl -s --max-time 5 ifconfig.me 2>/dev/null || curl -s --max-time 5 icanhazip.com 2>/dev/null || echo "")
+# Auto-detect public IP (try multiple services, validate result)
+detect_ip() {
+    local ip=""
+    for svc in "https://api.ipify.org" "https://checkip.amazonaws.com" "https://ipinfo.io/ip" "https://ifconfig.me" "https://icanhazip.com"; do
+        ip=$(curl -s --max-time 3 "$svc" 2>/dev/null | tr -d '[:space:]')
+        # Validate it looks like an IPv4 address
+        if [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "$ip"
+            return
+        fi
+    done
+    echo ""
+}
+
+DETECTED_IP=$(detect_ip)
 
 if [[ -n "$DETECTED_IP" ]]; then
     printf "  ${G}Detected public IP:${N} ${B}%s${N}\n" "$DETECTED_IP"
@@ -45,6 +58,7 @@ if [[ -n "$DETECTED_IP" ]]; then
         SERVER_PUBLIC_IP="$DETECTED_IP"
     fi
 else
+    info "Could not auto-detect public IP."
     read -rp "  Enter server public IP: " SERVER_PUBLIC_IP
 fi
 
