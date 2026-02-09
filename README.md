@@ -40,11 +40,12 @@ scp /root/tunnel-client-files/client-install.sh root@CLIENT_IP:/tmp/
 ssh root@CLIENT_IP 'bash /tmp/client-install.sh'
 ```
 
-### 3. Test
+### 3. Verify
+
+Run this on **Server** or **Client** to check tunnel health:
 
 ```bash
-ping 10.10.10.1   # AmneziaWG
-ping 10.20.20.1   # OpenVPN
+curl -sL https://raw.githubusercontent.com/LivingG0D/Nevermore/main/tunnel-scripts/test-tunnel.sh | sudo bash
 ```
 
 ## Uninstall

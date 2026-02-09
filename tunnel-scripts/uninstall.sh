@@ -60,11 +60,19 @@ rm -f /usr/local/bin/ck-client
 rm -f /usr/local/bin/amneziawg-go
 rm -f /usr/bin/awg /usr/bin/awg-quick 2>/dev/null || true
 rm -f /usr/local/bin/awg /usr/local/bin/awg-quick 2>/dev/null || true
+# Kernel module
+if lsmod | grep -q amneziawg; then
+    modprobe -r amneziawg 2>/dev/null || true
+fi
+rm -f /lib/modules/$(uname -r)/extra/amneziawg.ko 2>/dev/null || true
+depmod -a 2>/dev/null || true
 
 # ── Remove build leftovers ───────────────────────────────────────────────────
 echo "▶ Cleaning build files..."
 rm -rf /tmp/amneziawg-tools
 rm -rf /tmp/amneziawg-go
+rm -rf /tmp/amneziawg-kmod
+rm -f /tmp/client-install.sh
 
 # ── Reload sysctl ────────────────────────────────────────────────────────────
 sysctl --system > /dev/null 2>&1 || true
