@@ -331,6 +331,7 @@ err(){ printf "  ${R}✖${N} %s\n" "$1"; }
 step(){ printf "\n${B}▶ [%s] %s${N}\n" "$1" "$2"; }
 spin(){ local pid=$1 msg=$2; local c='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'; while kill -0 "$pid" 2>/dev/null; do for((i=0;i<${#c};i++)); do printf "\r  ${C}%s${N} %s" "${c:$i:1}" "$msg"; sleep 0.1; done; done; wait "$pid" 2>/dev/null || true; printf "\r\033[2K"; }
 [[ $EUID -ne 0 ]] && { err "Run as root: sudo bash $0"; exit 1; }
+export TERM=${TERM:-xterm}
 clear
 printf "${B}${C}\n  ╔═══════════════════════════════════════════╗\n  ║   🛡️  Tunnel Client Setup (auto)          ║\n  ╚═══════════════════════════════════════════╝\n\n${N}"
 CLIENTEOF
@@ -609,7 +610,7 @@ if [[ -n "$CLIENT_IP" ]]; then
     info "Deploying to ${CLIENT_IP}..."
     # Copy installer and run it
     scp -o StrictHostKeyChecking=accept-new "$OUT/client-install.sh" "root@${CLIENT_IP}:/tmp/client-install.sh" < /dev/tty
-    ssh -o StrictHostKeyChecking=accept-new "root@${CLIENT_IP}" "bash /tmp/client-install.sh && rm /tmp/client-install.sh" < /dev/tty
+    ssh -t -o StrictHostKeyChecking=accept-new "root@${CLIENT_IP}" "export TERM=xterm; bash /tmp/client-install.sh && rm /tmp/client-install.sh"
 else
     echo ""
     printf "  ${B}Manual deploy:${N}\n\n"
