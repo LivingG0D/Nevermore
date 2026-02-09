@@ -82,6 +82,14 @@ systemctl status openvpn-cloak        # (client)
 journalctl -u openvpn-cloak -f        # logs
 ```
 
+## Uninstall
+
+Run on either server or client to cleanly remove everything:
+
+```bash
+curl -sL https://raw.githubusercontent.com/LivingG0D/Nevermore/main/tunnel-scripts/uninstall.sh | sudo bash
+```
+
 ## Firewall
 
 If you have `ufw` or `iptables` rules, open these on the **server**:
